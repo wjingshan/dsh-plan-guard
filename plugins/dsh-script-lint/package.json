@@ -1,6 +1,6 @@
 {
   "name": "dsh-script-lint",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "DSH 插件：在 write/edit 缝上拦住踩过的 shell / PowerShell 坑（set -e 命令替换陷阱、递归 grep 裸变量、.ps1 缺 BOM）",
   "type": "module",
   "main": "./src/index.mjs",

@@ -17,8 +17,7 @@
  * @module dsh-skill-lint
  */
 import { readFile } from 'node:fs/promises'
-import z from '@deepseek-ai/schemastery'
-import { DEFAULT_SIZE_LIMIT, lint, render, skillTarget } from './lint.mjs'
+import { lint, render, resolveConfig, skillTarget } from './lint.mjs'
 
 /** Cordis 插件名，用于加载器诊断。 */
 export const name = 'skill-lint'
@@ -27,33 +26,21 @@ export const name = 'skill-lint'
 export const inject = ['tools']
 
 /**
- * 插件配置。
- *
- * 故意的默认值：`roots: []` 表示「任何位置名叫 SKILL.md 的文件都查」。
- * 断言宁可多报，也不要因为路径没猜对而漏报 —— 漏报是沉默的，多报至少看得见。
- */
-export const Config = z.object({
-  sizeLimit: z
-    .number()
-    .step(1)
-    .min(1)
-    .default(DEFAULT_SIZE_LIMIT)
-    .description('SKILL.md 正文的码点上限，默认对齐 dsh-compaction-tool-result-pruner 的 thresholdChars'),
-  roots: z
-    .array(z.string())
-    .default([])
-    .description('只检查这些 skill 根底下的文件；留空表示不限制路径'),
-})
-
-/**
  * 注册两条断言缝。
  *
+ * 配置字段见 {@link resolveConfig}（`sizeLimit` / `roots`）。
+ *
+ * 这个插件是**零运行时依赖**的：cordis 在插件没有 `Config` 导出时会把原始 config
+ * **直接透传**给 `apply`（见 cordis 的 `resolveConfig`），所以规范化自己手写就行。
+ * 换来的是复制、软链、pnpm 安装行为完全一致 —— 不会出现「解析不到某个
+ * @deepseek-ai/* 包」这种跟环境绑定的故障。
+ *
  * @param ctx - 插件上下文；注册随它的生命周期回收。
- * @param config - 见 {@link Config}。
+ * @param config - patch 条目里的 config，可为空。
  */
 export function apply(ctx, config = {}) {
-  const sizeLimit = config.sizeLimit ?? DEFAULT_SIZE_LIMIT
-  const roots = config.roots ?? []
+  const { sizeLimit, roots, problems } = resolveConfig(config)
+  for (const p of problems) ctx.logger?.warn?.(`[skill-lint] ${p}`)
 
   // 缝 1：写入前拦截。坏文件不落地 —— 这是 write 特有的优势。
   ctx.on('tools/pre-execute', async (exec, next) => {

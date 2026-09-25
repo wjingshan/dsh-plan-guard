@@ -1,6 +1,6 @@
 {
   "name": "dsh-skill-lint",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "SKILL.md 确定性断言：写入前后校验 frontmatter（name/description/布尔键）与体积，不过则 deny / block 并把修正意见回喂模型",
   "type": "module",
   "main": "./src/index.mjs",

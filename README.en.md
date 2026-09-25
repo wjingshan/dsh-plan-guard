@@ -26,10 +26,14 @@ dsh-plan-guard/
 ├── plugins/                      ② Two DSH assertion plugins
 │   ├── dsh-skill-lint/           three assertions for SKILL.md
 │   └── dsh-script-lint/          three assertions for shell / PowerShell
+├── CONTRIBUTING.md               for people changing it: architecture + a worked rule example
+├── CHANGELOG.md                  what changed, and why
 ├── docs/background.md            where this came from, and why each decision
 ├── install.sh / install.ps1      install the skills
 ├── uninstall.sh / uninstall.ps1  remove the skills
-└── install-plugins.sh            install the plugins into a profile
+├── install-plugins.sh            install the plugins (copy route)
+├── verify.sh                     check installed vs. this repo
+└── update.sh                     pull + reinstall + verify
 ```
 
 ---
@@ -54,17 +58,61 @@ For a single project instead, copy the directories into `<project root>/.dsh/ski
 
 ### Plugins
 
+There are two ways to install. **The bundle install is recommended** — it is managed by the profile's package manager, updates cleanly via `dsh plugin`, and won't be removed by unrelated package operations.
+
+#### Route A: bundle install (recommended)
+
+```bash
+dsh plugin --profile web add 'github:wjingshan/dsh-plan-guard#path:/plugins/dsh-skill-lint'
+dsh plugin --profile web add 'github:wjingshan/dsh-plan-guard#path:/plugins/dsh-script-lint'
+```
+
+`#path:` is pnpm's git-subdirectory syntax — the repo root is one project and each plugin is a subdirectory of it, so the spec has to point at the subdirectory. Change the profile name if yours isn't `web`.
+
+This registers the plugin in the profile's `dsh.profile.bundles`, so a later `pnpm install` won't drop it.
+
+#### Route B: copy install (offline, or when hacking on the source)
+
 ```bash
 bash install-plugins.sh
 ```
 
-This does two things: copies both packages into `<profile>/node_modules/`, then appends `insert` entries to `<profile>/cordis.patch.yml`.
+It copies both packages into `<profile>/node_modules/` and appends `insert` entries to `<profile>/cordis.patch.yml`.
 
-**It copies rather than symlinks** — Node resolves modules by realpath (`preserveSymlinks: false`), so a symlinked plugin would look for `@deepseek-ai/schemastery` next to its *source* directory, where there is no `node_modules`.
+> ⚠️ **This route is not durable — we have seen it fail.** A package dropped into `node_modules/` by hand is not tracked by the package manager, so it counts as extraneous. In our case a single `pnpm install` on the profile (triggered by an unrelated plugin) removed one of the plugins and rewrote both `insert` entries out of `cordis.patch.yml` — **both plugins silently stopped working, with no warning at all**, until someone went looking.
+>
+> Use this route only for a quick trial or while debugging the source. **For anything durable, use Route A.**
 
-On Windows, do those same two steps by hand — see the Chinese README for the exact commands. The profile's `patchReload` is `live`, so no restart.
+For source debugging a symlink is less work (the plugins have zero runtime dependencies, so a symlink resolves fine):
 
----
+```bash
+ln -s "$PWD/plugins/dsh-script-lint" "$PROFILE/node_modules/dsh-script-lint"
+```
+
+#### Windows
+
+Route A's `dsh plugin` commands are identical (run them in PowerShell). For Route B, do the same two steps by hand: copy both directories from `plugins` into the profile's `node_modules`, then append the `insert` entries to `<profile>/cordis.patch.yml`.
+
+#### Confirming it actually installed
+
+```bash
+./verify.sh
+```
+
+It checks whether what's installed matches this repo, and distinguishes a bundle install from a hand copy. It also errors when a patch entry exists but the package doesn't — that makes DSH fail to load. Run it once after installing; it saves you from "I thought it was installed".
+
+### Updating
+
+```bash
+./update.sh            # pull, reinstall only what was installed, verify
+./update.sh --no-pull  # you already pulled
+./update.sh --check    # just look for new commits upstream, change nothing
+./verify.sh            # check only, change nothing
+```
+
+**Why `git pull` alone is not enough**: installing copies files into `node_modules` / `skills`, so new code pulled down does not replace the copy that's in use. `update.sh` is that missing step.
+
+Bundle-installed plugins are managed by `dsh plugin`; `update.sh` prints the exact `dsh plugin add` command instead of guessing.
 
 ## The three planning skills
 

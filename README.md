@@ -32,10 +32,14 @@ dsh-plan-guard/
 ├── plugins/                       ② 断言：两个 DSH 插件
 │   ├── dsh-skill-lint/            写 SKILL.md 时的三条断言
 │   └── dsh-script-lint/           写 shell / PowerShell 时的三条断言
+├── CONTRIBUTING.md                给想改它的人：架构 + 加一条判据的完整例子
+├── CHANGELOG.md                   改了什么，以及为什么
 ├── docs/background.md             来龙去脉 + 每条设计决定为什么这么做
 ├── install.sh / install.ps1       装 skills
 ├── uninstall.sh / uninstall.ps1   卸 skills
-└── install-plugins.sh             装两个插件进 profile
+├── install-plugins.sh             装两个插件进 profile（复制路线）
+├── verify.sh                      检查「装上去的」和「仓库里的」是否一致
+└── update.sh                      拉取 + 重装 + 校验
 ```
 
 ---
@@ -67,33 +71,61 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 
 ### 断言插件
 
-**macOS / Linux**
+插件有两种装法。**推荐 bundle 安装** —— 它由 profile 的包管理器管理，能被 `dsh plugin` 正常更新，也不会被别的包管理操作清掉。
+
+#### 路线 A：bundle 安装（推荐）
+
+```bash
+dsh plugin --profile web add 'github:wjingshan/dsh-plan-guard#path:/plugins/dsh-skill-lint'
+dsh plugin --profile web add 'github:wjingshan/dsh-plan-guard#path:/plugins/dsh-script-lint'
+```
+
+`#path:` 是 pnpm 的 git 子目录语法 —— 仓库根是一个项目，每个插件是它的一个子目录，所以必须指到子目录上。profile 名按实际情况改（`web` 是 Web 界面 profile）。
+
+装完会被登记进 profile 的 `dsh.profile.bundles`，之后再跑 `pnpm install` 也不会掉。
+
+#### 路线 B：复制安装（离线、或想改源码时用）
 
 ```bash
 bash install-plugins.sh
 ```
 
-它做两件事：把两个包复制进 `<profile>/node_modules/`，再往 `<profile>/cordis.patch.yml` 追加 `insert` 条目。
-**用复制而不是软链** —— Node 默认按 realpath 解析模块（`preserveSymlinks: false`），软链进来的插件会从源码目录去找 `@deepseek-ai/schemastery`，那里没有 `node_modules`。
+它把两个包复制进 `<profile>/node_modules/`，再往 `<profile>/cordis.patch.yml` 追加 `insert` 条目。
 
-**Windows** —— 同样两件事，手动做：
+> ⚠️ **这条路不持久，实测翻过车。** 手动放进 `node_modules/` 的包不是包管理器管理的，会被当成"多余的包"。我们遇到过：profile 上跑了一次 `pnpm install`（由别的插件触发），一个插件被清掉、`cordis.patch.yml` 里两条 `insert` 也被一并重写掉了 —— **两个插件静默失效，没有任何提示**，直到有人去查才发现。
+>
+> 所以这条路只适合临时试用或改源码调试。**长期使用请走路线 A。**
 
-```powershell
-$Profile = "$env:USERPROFILE\.dsh\profiles\web"   # profile 名按你的实际情况改
-Copy-Item .\plugins\dsh-skill-lint  "$Profile\node_modules\" -Recurse
-Copy-Item .\plugins\dsh-script-lint "$Profile\node_modules\" -Recurse
-# 然后往 $Profile\cordis.patch.yml 末尾追加：
-#   - insert:
-#       - id: skill-lint
-#         name: 'dsh-skill-lint'
-#   - insert:
-#       - id: script-lint
-#         name: 'dsh-script-lint'
+想改源码调试，用软链更省事（插件零运行时依赖，所以软链能正常解析）：
+
+```bash
+ln -s "$PWD/plugins/dsh-script-lint" "$PROFILE/node_modules/dsh-script-lint"
 ```
 
-profile 的 `patchReload` 是 `live`，改完即生效，不用重启。
+#### Windows
 
----
+路线 A 的 `dsh plugin` 命令一样（在 PowerShell 里跑）。路线 B 手动做：把 `plugins` 下两个目录复制进 `<profile>` 的 `node_modules`，再往 `<profile>/cordis.patch.yml` 追加 `insert` 条目。
+
+#### 装完怎么确认
+
+```bash
+./verify.sh
+```
+
+它检查「装上去的」和「仓库里的」是否一致，并区分 bundle 安装 / 手动复制；还会在「patch 有条目但包不在」时报错 —— 那种情况会让 DSH 直接加载失败。装完顺手跑一次，能省掉「以为装上了其实没有」。
+
+### 更新
+
+```bash
+./update.sh            # 拉取最新 + 只重装装过的 + 校验
+./update.sh --no-pull  # 已经自己拉过了
+./update.sh --check    # 只看上游有没有新提交，不做改动
+./verify.sh            # 只检查，不改动
+```
+
+**为什么不能只 `git pull`**：安装是把文件复制进 `node_modules` / `skills` 的，拉下来的新代码不会自动替换装上去的旧副本。`update.sh` 补的就是这一步。
+
+bundle 安装的插件由 `dsh plugin` 管，`update.sh` 会打印出该跑的 `dsh plugin add` 命令而不是替你猜。
 
 ## 三个规划 skill
 

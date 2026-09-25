@@ -8,6 +8,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  RULE_CODES,
   lint,
   lintShell,
   lintPowerShell,
@@ -22,6 +23,7 @@ import {
   firstWord,
   extOf,
   render,
+  resolveConfig,
 } from '../src/rules.mjs'
 
 const codes = (src) => lintShell(src).map((p) => p.code)
@@ -311,4 +313,58 @@ test('firstWord / extOf 的边角', () => {
 
 test('findErrexitTraps 在没有 set -e 时直接返回空', () => {
   assert.deepEqual(findErrexitTraps('x=$(grep a f)'), [])
+})
+
+// ── 配置规范化与规则开关（零依赖路线：手写代替 schemastery）────────
+
+test('resolveConfig：空/非法配置落到默认值，不抛错', () => {
+  for (const raw of [undefined, null, {}, 'nonsense', 42]) {
+    const cfg = resolveConfig(raw)
+    assert.deepEqual(cfg.disabledRules, [])
+    assert.deepEqual(cfg.problems, [])
+  }
+})
+
+test('resolveConfig：合法值原样保留', () => {
+  const cfg = resolveConfig({ disabledRules: ['PS1_NO_BOM'] })
+  assert.deepEqual(cfg.disabledRules, ['PS1_NO_BOM'])
+  assert.deepEqual(cfg.problems, [])
+})
+
+test('resolveConfig：非数组或含非字符串 → 回退 + 报告', () => {
+  const a = resolveConfig({ disabledRules: 'PS1_NO_BOM' })
+  assert.deepEqual(a.disabledRules, [])
+  assert.equal(a.problems.length, 1)
+
+  const b = resolveConfig({ disabledRules: [1, 2] })
+  assert.deepEqual(b.disabledRules, [])
+  assert.equal(b.problems.length, 1)
+})
+
+test('resolveConfig：认不出的判据码会提示（否则你会以为关掉了其实没关）', () => {
+  const cfg = resolveConfig({ disabledRules: ['NOT_A_RULE'] })
+  assert.match(cfg.problems.join('\n'), /NOT_A_RULE/)
+  assert.match(cfg.problems.join('\n'), new RegExp(RULE_CODES[0]))
+})
+
+test('resolveConfig：未知配置键报告', () => {
+  const cfg = resolveConfig({ disableRules: [] })
+  assert.match(cfg.problems.join('\n'), /disableRules/)
+})
+
+test('lint：disabledRules 真的把对应判据过滤掉', () => {
+  const ps1 = 'Write-Host "中文"'
+  assert.equal(lint({ filePath: '/x/a.ps1', content: ps1 }).length, 1)
+  assert.deepEqual(lint({ filePath: '/x/a.ps1', content: ps1, disabledRules: ['PS1_NO_BOM'] }), [])
+
+  const sh = 'set -euo pipefail\nn=$(grep a f)\n'
+  assert.ok(lint({ filePath: '/x/a.sh', content: sh }).length > 0)
+  assert.deepEqual(lint({ filePath: '/x/a.sh', content: sh, disabledRules: ['SHELL_ERREXIT_TRAP'] }), [])
+})
+
+test('RULE_CODES 和实际能报出来的码一致（防止忘更新）', () => {
+  const emitted = new Set()
+  for (const p of lintShell('set -euo pipefail\nn=$(grep a f)\ngrep -rn x $D\n')) emitted.add(p.code)
+  for (const p of lintPowerShell('中文')) emitted.add(p.code)
+  assert.deepEqual([...emitted].sort(), [...RULE_CODES].sort())
 })

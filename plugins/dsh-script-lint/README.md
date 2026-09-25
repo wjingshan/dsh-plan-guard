@@ -60,6 +60,12 @@ DSH 插件：在 `write` / `edit` 的缝上拦住**已经真实踩过**的 shell
 
 ## 安装
 
+> ⚠️ **这条路不持久。** 手动复制进 `node_modules/` 的包不是包管理器管理的，profile 上的一次
+> `pnpm install`（可能由别的插件触发）就会把它当"多余的包"清掉，`cordis.patch.yml` 里的
+> `insert` 条目也可能被随之重写。**实测发生过：两个插件静默失效，没有任何提示。**
+> 长期使用请走主 README 的「路线 A：bundle 安装」。
+
+
 ```bash
 PROFILE="${DSH_HOME:-$HOME/.dsh}/profiles/web"
 
@@ -72,7 +78,8 @@ cp -R dsh-script-lint "$PROFILE/node_modules/"
 #         name: 'dsh-script-lint'
 ```
 
-**为什么用 `cp` 而不是 `ln -s`**：Node 默认按 realpath 解析模块（`preserveSymlinks: false`），symlink 进来的插件会从源目录去找依赖，找不到。
+**为什么用复制而不是软链**：这一版插件是**零运行时依赖**的（只用 `node:` 内置模块），所以软链在技术上也能解析 —— 早先那条"软链会找不到 `@deepseek-ai/schemastery`"的限制已经不存在了。
+真正的取舍变成了 pnpm：手动复制或软链进 `node_modules/` 的包**不是 pnpm 管理的**，将来对 profile 跑 `pnpm install` 或任何 `dsh plugin` 操作时，它可能被当成"多余的包"清掉。想要长期稳定、可更新，用 **bundle 安装**（见主 README 的「安装」一节）。
 
 profile 的 `patchReload: live` 让新插件**无需重启**即可生效。
 

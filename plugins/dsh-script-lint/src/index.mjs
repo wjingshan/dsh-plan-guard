@@ -1,20 +1,20 @@
 // dsh-script-lint —— 缝接线。
 //
 // 判据全在 src/rules.mjs；这里只负责把判据挂到 DSH 的两条缝上，不掺任何判断。
+//
+// 这个插件是**零运行时依赖**的：cordis 在插件没有 `Config` 导出时会把原始 config
+// **直接透传**给 `apply`（见 cordis 的 `resolveConfig`），所以规范化自己手写就行。
+// 换来的是复制、软链、pnpm 安装行为完全一致 —— 不会出现「解析不到某个
+// @deepseek-ai/* 包」这种跟环境绑定的故障。
 
 import { readFile } from 'node:fs/promises'
-import z from '@deepseek-ai/schemastery'
-import { lint, render, SHELL_EXTS, PS_EXTS } from './rules.mjs'
+import { lint, render, resolveConfig, SHELL_EXTS, PS_EXTS } from './rules.mjs'
 
+/** Cordis 插件名，用于加载器诊断。 */
 export const name = 'script-lint'
-export const inject = ['tools']
 
-export const Config = z.object({
-  disabledRules: z
-    .array(z.string())
-    .default([])
-    .description('要关掉的判据码，例如 ["PS1_NO_BOM"]；留空表示三条全开'),
-})
+/** 本插件读的是工具注册表服务：需要 `tools` 才能收到 tools/* 事件。 */
+export const inject = ['tools']
 
 const HANDLED = [...SHELL_EXTS, ...PS_EXTS]
 
@@ -24,10 +24,17 @@ function isTarget(filePath) {
   return HANDLED.some((e) => lower.endsWith(e))
 }
 
+/**
+ * 注册两条断言缝。配置字段见 {@link resolveConfig}（`disabledRules`）。
+ *
+ * @param ctx - 插件上下文；注册随它的生命周期回收。
+ * @param config - patch 条目里的 config，可为空。
+ */
 export function apply(ctx, config = {}) {
-  const disabled = new Set(config.disabledRules ?? [])
-  const check = (filePath, content) =>
-    lint({ filePath, content }).filter((p) => !disabled.has(p.code))
+  const { disabledRules, problems } = resolveConfig(config)
+  for (const p of problems) ctx.logger?.warn?.(`[script-lint] ${p}`)
+
+  const check = (filePath, content) => lint({ filePath, content, disabledRules })
 
   // 缝 1：write —— 内容还没落盘，可以直接拒绝，坏文件根本不产生。
   ctx.on('tools/pre-execute', async (exec, next) => {

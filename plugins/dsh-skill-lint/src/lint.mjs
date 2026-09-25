@@ -142,6 +142,49 @@ function dirnameOf(p) {
  * @param args.sizeLimit - 体积上限（码点）。
  * @returns `{ code, message }[]`。
  */
+/**
+ * 把原始 config 规范化：填默认值、校验类型、报告未知键。
+ *
+ * 为什么手写而不用 schemastery：cordis 的 `resolveConfig` 在插件没有 `Config` 导出时
+ * 会把原始对象**直接透传**（`if (!runtime.Config) return config`）。既然只需要两个带默认值
+ * 的字段，手写换来的是**零运行时依赖** —— 复制、软链、pnpm 安装行为完全一致，也不会出现
+ * 「解析不到 @deepseek-ai/schemastery」这类和环境绑定的故障。
+ *
+ * 坏配置只报告、不抛错：配置写错不该让整个插件加载失败 —— 静默不生效比报错更糟，
+ * 但直接不加载同样糟。
+ *
+ * @param raw - patch 条目里的 config；可能是 null / undefined / 任意值。
+ * @returns `{ sizeLimit, roots, problems }`，前两项已填好默认值。
+ */
+export function resolveConfig(raw) {
+  const cfg = raw !== null && typeof raw === 'object' ? raw : {}
+  const problems = []
+
+  let sizeLimit = DEFAULT_SIZE_LIMIT
+  if (cfg.sizeLimit !== undefined) {
+    if (Number.isInteger(cfg.sizeLimit) && cfg.sizeLimit > 0) {
+      sizeLimit = cfg.sizeLimit
+    } else {
+      problems.push(`sizeLimit 必须是正整数，收到 ${JSON.stringify(cfg.sizeLimit)}；已回退到 ${DEFAULT_SIZE_LIMIT}`)
+    }
+  }
+
+  let roots = []
+  if (cfg.roots !== undefined) {
+    if (Array.isArray(cfg.roots) && cfg.roots.every((r) => typeof r === 'string')) {
+      roots = cfg.roots
+    } else {
+      problems.push(`roots 必须是字符串数组，收到 ${JSON.stringify(cfg.roots)}；已回退到 []`)
+    }
+  }
+
+  for (const key of Object.keys(cfg)) {
+    if (key !== 'sizeLimit' && key !== 'roots') problems.push(`未知配置键 \`${key}\`，已忽略`)
+  }
+
+  return { sizeLimit, roots, problems }
+}
+
 export function lint({ content, skillName, sizeLimit = DEFAULT_SIZE_LIMIT }) {
   const problems = []
   const fm = splitFrontmatter(content)

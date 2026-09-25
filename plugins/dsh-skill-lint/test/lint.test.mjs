@@ -11,6 +11,7 @@ import {
   codePointLength,
   lint,
   render,
+  resolveConfig,
   scalar,
   skillTarget,
   splitFrontmatter,
@@ -165,4 +166,44 @@ test('render 带路径、判据码和行动指引', () => {
   assert.ok(text.includes('/tmp/skills/x/SKILL.md'))
   assert.ok(text.includes('[FM_INVALID]'))
   assert.ok(text.includes('不会生效'))
+})
+
+// ── 配置规范化（零依赖路线：手写代替 schemastery）──────────────────
+
+test('resolveConfig：空/非法配置落到默认值，不抛错', () => {
+  for (const raw of [undefined, null, {}, 'nonsense', 42, []]) {
+    const cfg = resolveConfig(raw)
+    assert.equal(cfg.sizeLimit, DEFAULT_SIZE_LIMIT)
+    assert.deepEqual(cfg.roots, [])
+  }
+})
+
+test('resolveConfig：合法值原样保留', () => {
+  const cfg = resolveConfig({ sizeLimit: 100, roots: ['/a', '/b'] })
+  assert.equal(cfg.sizeLimit, 100)
+  assert.deepEqual(cfg.roots, ['/a', '/b'])
+  assert.deepEqual(cfg.problems, [])
+})
+
+test('resolveConfig：坏值回退 + 报告，而不是抛错（配置写错不该让插件加载失败）', () => {
+  const a = resolveConfig({ sizeLimit: -1 })
+  assert.equal(a.sizeLimit, DEFAULT_SIZE_LIMIT)
+  assert.equal(a.problems.length, 1)
+
+  assert.equal(resolveConfig({ sizeLimit: 1.5 }).sizeLimit, DEFAULT_SIZE_LIMIT)
+  assert.equal(resolveConfig({ sizeLimit: 0 }).sizeLimit, DEFAULT_SIZE_LIMIT)
+  assert.equal(resolveConfig({ sizeLimit: '100' }).sizeLimit, DEFAULT_SIZE_LIMIT)
+
+  const c = resolveConfig({ roots: 'not-an-array' })
+  assert.deepEqual(c.roots, [])
+  assert.equal(c.problems.length, 1)
+
+  assert.deepEqual(resolveConfig({ roots: [1, 2] }).roots, [])
+})
+
+test('resolveConfig：未知键报告但不影响已知键', () => {
+  const cfg = resolveConfig({ sizeLimit: 500, typoKey: true })
+  assert.equal(cfg.sizeLimit, 500)
+  assert.deepEqual(cfg.roots, [])
+  assert.match(cfg.problems.join('\n'), /typoKey/)
 })

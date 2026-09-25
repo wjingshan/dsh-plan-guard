@@ -69,6 +69,12 @@ npm test        # node --test test/*.test.mjs
 
 ## 安装
 
+> ⚠️ **这条路不持久。** 手动复制进 `node_modules/` 的包不是包管理器管理的，profile 上的一次
+> `pnpm install`（可能由别的插件触发）就会把它当"多余的包"清掉，`cordis.patch.yml` 里的
+> `insert` 条目也可能被随之重写。**实测发生过：两个插件静默失效，没有任何提示。**
+> 长期使用请走主 README 的「路线 A：bundle 安装」。
+
+
 ### 路线 A：塞进 profile（本地开发用这个）
 
 ```bash
@@ -86,9 +92,8 @@ cp -R dsh-skill-lint "$PROFILE/node_modules/"
 
 profile 是 `patchReload: live`，保存后即生效，不需要重启。
 
-**为什么用 `cp` 而不是 `ln -s`**：Node 默认按 realpath 解析模块（`preserveSymlinks: false`），
-symlink 进来的插件会从源目录去找 `@deepseek-ai/schemastery`，而那里没有 `node_modules`。
-复制过去才能从 profile 的 `node_modules` 解析到依赖。
+**为什么用复制而不是软链**：这一版插件是**零运行时依赖**的（只用 `node:` 内置模块），所以软链在技术上也能解析 —— 早先那条"软链会找不到 `@deepseek-ai/schemastery`"的限制已经不存在了。
+真正的取舍变成了 pnpm：手动复制或软链进 `node_modules/` 的包**不是 pnpm 管理的**，将来对 profile 跑 `pnpm install` 或任何 `dsh plugin` 操作时，它可能被当成"多余的包"清掉。想要长期稳定、可更新，用 **bundle 安装**（见主 README 的「安装」一节）。
 
 ### 路线 B：当 bundle 正式安装
 

@@ -428,11 +428,65 @@ export function lintShell(text) {
   return problems
 }
 
-export function lint({ filePath, content }) {
+/** 本插件认识的全部判据码 —— 也是 `disabledRules` 的合法取值。 */
+export const RULE_CODES = ['SHELL_ERREXIT_TRAP', 'SHELL_GREP_UNQUOTED_PATH', 'PS1_NO_BOM']
+
+/**
+ * 把原始 config 规范化：填默认值、校验类型、报告未知键。
+ *
+ * 为什么手写而不用 schemastery：cordis 的 `resolveConfig` 在插件没有 `Config` 导出时
+ * 会把原始对象**直接透传**（`if (!runtime.Config) return config`）。既然只需要一个字段，
+ * 手写换来的是**零运行时依赖** —— 复制、软链、pnpm 安装行为完全一致，也不会出现
+ * 「解析不到 @deepseek-ai/schemastery」这类跟环境绑定的故障。
+ *
+ * 坏配置只报告、不抛错：配置写错不该让整个插件加载失败 —— 静默不生效比报错更糟，
+ * 但直接不加载同样糟。
+ *
+ * @param raw - patch 条目里的 config；可能是 null / undefined / 任意值。
+ * @returns `{ disabledRules, problems }`。
+ */
+export function resolveConfig(raw) {
+  const cfg = raw !== null && typeof raw === 'object' ? raw : {}
+  const problems = []
+
+  let disabledRules = []
+  if (cfg.disabledRules !== undefined) {
+    if (Array.isArray(cfg.disabledRules) && cfg.disabledRules.every((r) => typeof r === 'string')) {
+      disabledRules = cfg.disabledRules
+      for (const code of disabledRules) {
+        if (!RULE_CODES.includes(code)) {
+          problems.push(`disabledRules 里的 \`${code}\` 不是已知判据码（已知：${RULE_CODES.join('、')}），会被忽略`)
+        }
+      }
+    } else {
+      problems.push(`disabledRules 必须是字符串数组，收到 ${JSON.stringify(cfg.disabledRules)}；已回退到 []`)
+    }
+  }
+
+  for (const key of Object.keys(cfg)) {
+    if (key !== 'disabledRules') problems.push(`未知配置键 \`${key}\`，已忽略`)
+  }
+
+  return { disabledRules, problems }
+}
+
+/**
+ * 按扩展名分发到对应判据，并按 `disabledRules` 过滤。
+ *
+ * @param args.filePath - 被写入的路径（决定用哪套判据）。
+ * @param args.content - 文件全文。
+ * @param args.disabledRules - 要跳过的判据码。
+ * @returns `{ code, message }[]`；空数组 = 放行。
+ */
+export function lint({ filePath, content, disabledRules = [] }) {
   const ext = extOf(filePath)
-  if (SHELL_EXTS.includes(ext)) return lintShell(content)
-  if (PS_EXTS.includes(ext)) return lintPowerShell(content)
-  return []
+  let problems = []
+  if (SHELL_EXTS.includes(ext)) problems = lintShell(content)
+  else if (PS_EXTS.includes(ext)) problems = lintPowerShell(content)
+
+  if (disabledRules.length === 0) return problems
+  const disabled = new Set(disabledRules)
+  return problems.filter((p) => !disabled.has(p.code))
 }
 
 export function render(filePath, problems) {

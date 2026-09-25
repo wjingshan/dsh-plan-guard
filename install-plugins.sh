@@ -6,9 +6,9 @@
 #
 # 为什么要「复制进 node_modules + 改 patch」：
 #   DSH 的插件是从 <profile>/node_modules 解析的，所以包必须真的躺在那里。
-#   用复制而不是软链 —— Node 默认按 realpath 解析模块（preserveSymlinks: false），
-#   软链进来的插件会从它自己的源码目录去找 @deepseek-ai/schemastery，那里没有
-#   node_modules，会解析失败。
+#   用复制而不是软链：这一版插件零运行时依赖，软链技术上也能解析；真正的区别是 pnpm ——
+#   手动放进 node_modules/ 的包不是 pnpm 管理的，将来 pnpm 操作可能把它清掉。
+#   想要长期稳定可更新，用 `dsh plugin add` 的 bundle 安装（见 README）。
 #
 # 可以用 DSH_PROFILE 指定 profile 名（默认 web）。
 set -euo pipefail
