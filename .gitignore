@@ -1,0 +1,24 @@
+# macOS
+.DS_Store
+._*
+
+# Node
+node_modules/
+npm-debug.log*
+pnpm-debug.log*
+package-lock.json
+pnpm-lock.yaml
+
+# 打包产物（这个仓库本身就是分发，不需要 zip）
+dist/
+*.zip
+*.zip.sha256
+
+# 编辑器
+.idea/
+.vscode/
+*.swp
+
+# 临时验证目录
+.tmp-*/
+tmp/

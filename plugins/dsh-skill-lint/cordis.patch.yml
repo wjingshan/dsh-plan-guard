@@ -1,0 +1,6 @@
+# dsh-skill-lint bundle patch：插入 SKILL.md 断言行。
+#
+# 判据与配置见 src/。默认挂上就有用 —— 不需要额外配置。
+- insert:
+    - id: skill-lint
+      name: 'dsh-skill-lint'
