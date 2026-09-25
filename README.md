@@ -2,6 +2,10 @@
 
 中文 | [English](README.en.md)
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-plugin-4B6BFB.svg)](https://github.com/wjingshan/dsh-plan-guard)
+[![Agent Skills](https://img.shields.io/badge/format-Agent%20Skills-2ea44f.svg)](https://github.com/wjingshan/dsh-plan-guard)
+
 给 DSH 用的**规划 skill + 写时断言插件**：前者让模型在动手前把问题想清楚，后者在模型把踩过的坑再踩一遍时当场拦住。**两半都不建通用体系 —— 只固化真实发生过的事。**
 
 > 这个仓库不是从零设计的。它是两台视频的落地产物：一台讲「写代码之前怎么想清楚」（Grilling / Brainstorming / Explore 三种规划框架），一台讲「写完怎么知道没坏」（把判断对不对从肉眼变成自动断言）。看完之后的结论是：**第一条视频的落点是提示词工件，加 skill 就够；第二条视频的落点是工程架构，加 skill 解决不了 —— 得挂到 DSH 的拦截缝上。** 这个仓库把两句话各做出了实物。

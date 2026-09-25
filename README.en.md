@@ -2,6 +2,10 @@
 
 [中文](README.md) | English
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-plugin-4B6BFB.svg)](https://github.com/wjingshan/dsh-plan-guard)
+[![Agent Skills](https://img.shields.io/badge/format-Agent%20Skills-2ea44f.svg)](https://github.com/wjingshan/dsh-plan-guard)
+
 **Planning skills + write-time assertion plugins for DSH.** The skills make the model think before it acts; the plugins catch it re-committing the exact mistakes that have already burned you. Neither half tries to be a general framework — both only encode things that actually happened.
 
 > This repo was not designed from scratch. It's the fallout of two videos: one on *how to think clearly before writing code* (the Grilling / Brainstorming / Explore planning frameworks), one on *how to know you haven't broken anything after* (turning "is it right?" from eyeballing into automatic assertions). The conclusion after watching: **the first video's landing point is a prompt artifact — a skill is enough. The second one's landing point is architecture — a skill can't help; you have to hook DSH's interception seams.** This repo is both of those made real.
