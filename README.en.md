@@ -62,14 +62,33 @@ There are two ways to install. **The bundle install is recommended** — it is m
 
 #### Route A: bundle install (recommended)
 
-```bash
-dsh plugin --profile web add 'github:wjingshan/dsh-plan-guard#path:/plugins/dsh-skill-lint'
-dsh plugin --profile web add 'github:wjingshan/dsh-plan-guard#path:/plugins/dsh-script-lint'
+Use the **`plugin_manager` tool with the `install_bundle` action** from inside DSH (the **Plugins** page in the Web sidebar is the same entry point):
+
+```
+action : install_bundle
+target : github:wjingshan/dsh-plan-guard#path:/plugins/dsh-skill-lint
 ```
 
-`#path:` is pnpm's git-subdirectory syntax — the repo root is one project and each plugin is a subdirectory of it, so the spec has to point at the subdirectory. Change the profile name if yours isn't `web`.
+Then the other one:
 
-This registers the plugin in the profile's `dsh.profile.bundles`, so a later `pnpm install` won't drop it.
+```
+action : install_bundle
+target : github:wjingshan/dsh-plan-guard#path:/plugins/dsh-script-lint
+```
+
+`#path:` is pnpm's git-subdirectory syntax — the repo root is one project and each plugin is a subdirectory of it, so the spec has to point at the subdirectory.
+
+A successful call returns `"application": "applied"`; the profile's `patchReload` is `live`, so no restart.
+
+> ⚠️ **Do not use `dsh plugin add`.** The CLI's `plugin` subcommand only **forwards its arguments to pnpm** (`dsh plugin --profile web add <pkg>` is `pnpm add <pkg>` in the profile directory) — the package does install, but it is **not registered in `dsh.profile.bundles`**, so this bundle's patch never applies and the plugin never loads. We verified that difference the hard way: the package was installed and the seams were dead.
+
+`install_bundle` does three things: runs the pnpm install, registers the package in `dsh.profile.bundles`, and verifies the bundle loads. For GitHub specs it also probes reachability with `git ls-remote` first, and it checks DSH peer-version compatibility after installing.
+
+#### Route B: copy install (offline, or when hacking on the source)
+
+```bash
+bash install-plugins.sh
+```
 
 #### Route B: copy install (offline, or when hacking on the source)
 

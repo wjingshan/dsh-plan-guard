@@ -75,14 +75,33 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 
 #### 路线 A：bundle 安装（推荐）
 
-```bash
-dsh plugin --profile web add 'github:wjingshan/dsh-plan-guard#path:/plugins/dsh-skill-lint'
-dsh plugin --profile web add 'github:wjingshan/dsh-plan-guard#path:/plugins/dsh-script-lint'
+在 DSH 里用 **`plugin_manager` 工具的 `install_bundle` 动作**（Web 界面侧栏的 **Plugins** 页是同一个入口）：
+
+```
+action : install_bundle
+target : github:wjingshan/dsh-plan-guard#path:/plugins/dsh-skill-lint
 ```
 
-`#path:` 是 pnpm 的 git 子目录语法 —— 仓库根是一个项目，每个插件是它的一个子目录，所以必须指到子目录上。profile 名按实际情况改（`web` 是 Web 界面 profile）。
+再装另一个：
 
-装完会被登记进 profile 的 `dsh.profile.bundles`，之后再跑 `pnpm install` 也不会掉。
+```
+action : install_bundle
+target : github:wjingshan/dsh-plan-guard#path:/plugins/dsh-script-lint
+```
+
+`#path:` 是 pnpm 的 git 子目录语法 —— 仓库根是一个项目，每个插件是它的一个子目录，所以必须指到子目录上。
+
+成功的返回是 `"application": "applied"`；profile 的 `patchReload` 是 `live`，不用重启。
+
+> ⚠️ **别用 `dsh plugin add`。** CLI 的 `plugin` 子命令只是把参数**原样转发给 pnpm**（`dsh plugin --profile web add <pkg>` 等于在 profile 目录里跑 `pnpm add <pkg>`）—— 包是装上了，但**不会登记进 `dsh.profile.bundles`**，于是这个 bundle 的 patch 不生效、插件根本不会被加载。这个差别我们实测过，包装好了但缝不工作。
+
+`install_bundle` 会做三件事：跑 pnpm 安装、把包登记进 `dsh.profile.bundles`、验证 bundle 能加载。除此之外，它对 GitHub 地址会先用 `git ls-remote` 探一次连通性，装完还会校验 DSH peer 版本兼容性。
+
+#### 路线 B：复制安装（离线、或想改源码时用）
+
+```bash
+bash install-plugins.sh
+```
 
 #### 路线 B：复制安装（离线、或想改源码时用）
 

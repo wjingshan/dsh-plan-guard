@@ -34,6 +34,17 @@
   `dsh plugin add` 命令而不是替你猜 spec。
 - **`CHANGELOG.md`** —— 本文件。
 
+### 修正
+
+- **README 原先推荐的 `dsh plugin --profile web add <spec>` 装不上。** 实测发现 CLI 的 `plugin`
+  子命令只是把参数**原样转发给 pnpm**，**不登记 `dsh.profile.bundles`** —— 包会装上，但 bundle 的
+  patch 不生效，插件根本不会加载（缝是死的）。正确入口是 **`plugin_manager` 工具的 `install_bundle`**，
+  它做三件事：pnpm 安装 + bundle 登记 + 加载校验。中英 README 都已改正。
+- **`verify.sh` 判断「是否 bundle 安装」的依据错了。** 原先看 `node_modules/<name>` 是不是软链，
+  但 profile 可能配了 hoisted linking —— 那种情况下 pnpm 装的包也是**真目录**，和手动复制从形态上
+  无法区分，于是 bundle 安装会被误报成「patch 里没有条目，不会被加载」。
+  现在改为读 `package.json` 的 `dsh.profile.bundles` 登记 —— 那才是权威依据。
+
 ### 测试
 
 - skill-lint：24 → **28** 条（新增 `resolveConfig` 的默认值/坏值/未知键覆盖）

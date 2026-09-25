@@ -87,35 +87,35 @@ say "断言插件（profile：$PROFILE）"
 if [ ! -d "$PROFILE" ]; then
   bad "找不到 profile 目录 —— 用 DSH_PROFILE=<名字> 指定"
 else
+  # 判断「是不是 bundle 安装」的依据是 package.json 的登记，**不是** node_modules 的形态：
+  # profile 可能配了 hoisted linking，那样 pnpm 装的包也是真目录，跟手动复制长得一样。
+  BUNDLES="$(cd "$PROFILE" && node -e "process.stdout.write((require('./package.json').dsh?.profile?.bundles ?? []).join('\n'))" 2>/dev/null || true)"
+
   for p in "${PLUGINS[@]}"; do
     src="$HERE/plugins/$p"
     dst="$PROFILE/node_modules/$p"
 
-    # 条目在不在 patch 里
-    if [ -f "$PATCH" ] && grep -q "name: '$p'" "$PATCH"; then
-      entry="有"
-    else
-      entry="无"
-    fi
+    in_bundles=0
+    if printf '%s\n' "$BUNDLES" | grep -qx "$p"; then in_bundles=1; fi
+
+    entry=0
+    if [ -f "$PATCH" ] && grep -q "name: '$p'" "$PATCH"; then entry=1; fi
 
     if [ ! -e "$dst" ]; then
-      if [ "$entry" = "有" ]; then
-        bad "$p：patch 条目在，但 node_modules 里没有包 —— DSH 会加载失败。重跑 install-plugins.sh"
+      if [ "$in_bundles" -eq 1 ]; then
+        bad "$p：登记为 bundle 了，但 node_modules 里没有包 —— DSH 会加载失败，重跑 install-plugins.sh"
       else
         note "$p 未安装"
       fi
       continue
     fi
 
-    # 是不是 pnpm 管理的（软链 → 由 dsh plugin add 装的）
-    if [ -L "$dst" ]; then
-      kind="bundle（pnpm 管理）"
+    if [ "$in_bundles" -eq 1 ]; then
+      kind="bundle（登记在 dsh.profile.bundles）"
+    elif [ "$entry" -eq 1 ]; then
+      kind="手动复制 + patch 条目"
     else
-      kind="手动复制"
-    fi
-
-    if [ "$entry" = "无" ]; then
-      bad "$p：包在 node_modules 里，但 patch 里没有条目 —— 不会被加载"
+      bad "$p：包在 node_modules 里，但既没登记为 bundle，patch 里也没有条目 —— 不会被加载"
       continue
     fi
 
@@ -133,20 +133,21 @@ else
     fi
   done
 
-  # 3. 反向检查：手动复制 + pnpm 管理混用时会重复加载
+  # ── 3. 反向检查：手动复制的那条路不持久 ─────────────────────
   echo
-  say "冲突检查"
+  say "持久性检查"
   manual=0
   for p in "${PLUGINS[@]}"; do
-    dst="$PROFILE/node_modules/$p"
-    if [ -e "$dst" ] && [ ! -L "$dst" ]; then manual=$((manual + 1)); fi
+    if [ -e "$PROFILE/node_modules/$p" ] && ! printf '%s\n' "$BUNDLES" | grep -qx "$p"; then
+      manual=$((manual + 1))
+    fi
   done
   if [ "$manual" -gt 0 ]; then
-    note "有 $manual 个插件是手动复制进 node_modules 的 —— 它们不是 pnpm 管理的，"
-    note "  将来对 profile 跑 pnpm 或 dsh plugin 操作时可能被当成多余包清掉。"
-    note "  想要长期稳定，改用 bundle 安装（见 README）。"
+    note "有 $manual 个插件是手动装进 node_modules 的 —— 它们不在 dsh.profile.bundles 里，"
+    note "  不是包管理器管理的，将来 pnpm 操作可能把它当多余包清掉（实测发生过）。"
+    note "  想长期稳定：用 dsh 的 plugin_manager 工具走 install_bundle，或见 README 路线 A。"
   else
-    ok "没有手动复制残留"
+    ok "没有手动安装残留"
   fi
 fi
 
