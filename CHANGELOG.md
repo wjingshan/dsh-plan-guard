@@ -9,7 +9,13 @@
 
 ## [0.2.0] — 2026-09-26
 
-首个带 tag 的发布（`v0.2.0`），可以用它钉住版本安装 —— 见 README「安装」。
+首个带 tag 的发布。可以用 tag 钉住版本安装（语法实测过）：
+
+```
+github:wjingshan/dsh-plan-guard#v0.2.0&path:/plugins/dsh-skill-lint
+```
+
+注意 git ref 要放在 `&path:` **前面**；反着写（`#path:...&tag=v0.2.0`）会报 `Could not resolve ... commit`。
 
 ### 改变（不兼容）
 

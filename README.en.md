@@ -84,6 +84,17 @@ target : github:wjingshan/dsh-plan-guard#path:/plugins/dsh-script-lint
 
 A successful call returns `"application": "applied"`; the profile's `patchReload` is `live`, so no restart.
 
+**Pinning a version**: by default the spec resolves the default branch's HEAD on every install. To pin a release, put the git ref **before** `&path:`:
+
+```
+action : install_bundle
+target : github:wjingshan/dsh-plan-guard#v0.2.0&path:/plugins/dsh-skill-lint
+```
+
+The reverse order (`#path:...&tag=v0.2.0`) fails with `Could not resolve ... commit` — we tested it.
+The ref can be a tag, a branch name, or a commit SHA.
+
+
 > ⚠️ **Do not use `dsh plugin add`.** The CLI's `plugin` subcommand only **forwards its arguments to pnpm** (`dsh plugin --profile web add <pkg>` is `pnpm add <pkg>` in the profile directory) — the package does install, but it is **not registered in `dsh.profile.bundles`**, so this bundle's patch never applies and the plugin never loads. We verified that difference the hard way: the package was installed and the seams were dead.
 
 `install_bundle` does three things: runs the pnpm install, registers the package in `dsh.profile.bundles`, and verifies the bundle loads. For GitHub specs it also probes reachability with `git ls-remote` first, and it checks DSH peer-version compatibility after installing.
